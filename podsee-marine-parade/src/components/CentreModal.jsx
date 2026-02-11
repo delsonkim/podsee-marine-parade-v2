@@ -9,20 +9,27 @@ export default function CentreModal({ centre, open, onClose }) {
 
   const handlePrimaryAction = () => {
     const number = centre.whatsappNumber?.toString().replace(/\s/g, '');
+    let destination = '';
     
     if (centre.contactType === 'Whatsapp' && number) {
-      window.open(`https://wa.me/${number}`, '_blank');
+      destination = `https://wa.me/${number}`;
     } else if (centre.contactType === 'LandLine' && number) {
-      window.open(`tel:${number}`, '_blank');
+      destination = `tel:${number}`;
     } else if (number) {
       // Fallback: use whatever number exists
-      window.open(`tel:${number}`, '_blank');
+      destination = `tel:${number}`;
+    }
+    
+    if (destination) {
+      const trackingUrl = `/api/r?centreId=${encodeURIComponent(centre.name)}&to=${encodeURIComponent(destination)}`;
+      window.open(trackingUrl, '_blank');
     }
   };
 
   const handleWebsiteClick = () => {
     if (centre.websiteUrl) {
-      window.open(centre.websiteUrl, '_blank');
+      const trackingUrl = `/api/r?centreId=${encodeURIComponent(centre.name)}&to=${encodeURIComponent(centre.websiteUrl)}`;
+      window.open(trackingUrl, '_blank');
     }
   };
 
