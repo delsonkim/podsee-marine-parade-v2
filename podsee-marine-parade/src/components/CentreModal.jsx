@@ -7,73 +7,60 @@ import LanguageIcon from '@mui/icons-material/Language';
 export default function CentreModal({ centre, open, onClose }) {
   if (!centre) return null;
 
-  // Direct Ping Click Tracking
-  const trackClick = async (type, destination) => {
+  // Helper function to send tracking data to Google Sheets
+  const trackClick = async (type, destinationUrl) => {
     const webhookUrl = import.meta.env.VITE_CLICK_LOG_WEBHOOK_URL;
-    
     if (!webhookUrl) {
-      console.warn('VITE_CLICK_LOG_WEBHOOK_URL not configured');
+      console.warn('Tracking Webhook URL not configured');
       return;
     }
 
-    const trackingData = {
+    const logData = {
       centreName: centre.name || 'unknown',
       clickType: type,
-      destinationUrl: destination,
+      destinationUrl: destinationUrl,
       sourcePage: window.location.href,
       userAgent: navigator.userAgent,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     try {
-      await fetch(webhookUrl, {
+      // Use "keepalive" to ensure the request finishes even if the page starts to navigate
+      fetch(webhookUrl, {
         method: 'POST',
-        mode: 'no-cors',
-        keepalive: true,
+        mode: 'no-cors', // Google Apps Script requires no-cors for simple POST
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(trackingData)
+        body: JSON.stringify(logData),
+        keepalive: true
       });
-    } catch (error) {
-      console.error('Click tracking failed:', error);
+    } catch (err) {
+      console.error('Tracking failed:', err);
     }
   };
 
   const handlePrimaryAction = () => {
     const number = centre.whatsappNumber?.toString().replace(/\s/g, '');
-    let destination = '';
-    let clickType = '';
+    if (!number) return;
+
+    const isWhatsApp = centre.contactType === 'Whatsapp';
+    const type = isWhatsApp ? 'WhatsApp' : 'Call';
+    const destination = isWhatsApp ? `https://wa.me/${number}` : `tel:${number}`;
     
-    // Debug: log the contactType to see what value we're getting
-    console.log('contactType from data:', centre.contactType);
+    // 1. Send the tracking ping
+    trackClick(type, destination);
     
-    // Check for WhatsApp (try multiple possible values from Excel)
-    if (centre.contactType && centre.contactType.toLowerCase().includes('whatsapp') && number) {
-      destination = `https://wa.me/${number}`;
-      clickType = 'WhatsApp';
-    } 
-    // Check for LandLine/Call
-    else if (centre.contactType && (centre.contactType.toLowerCase().includes('landline') || centre.contactType.toLowerCase().includes('call')) && number) {
-      destination = `tel:${number}`;
-      clickType = 'Call';
-    } 
-    // Fallback: if we have a number but couldn't determine type, default to Call
-    else if (number) {
-      destination = `tel:${number}`;
-      clickType = 'Call';
-    }
-    
-    if (destination && clickType) {
-      console.log('Tracking click:', clickType, destination);
-      trackClick(clickType, destination);
-      setTimeout(() => {
-        window.open(destination, '_blank');
-      }, 100);
-    }
+    // 2. Wait 100ms for the ping to initiate, then open
+    setTimeout(() => {
+      window.open(destination, '_blank');
+    }, 100);
   };
 
   const handleWebsiteClick = () => {
     if (centre.websiteUrl) {
+      // 1. Send the tracking ping
       trackClick('Website', centre.websiteUrl);
+      
+      // 2. Wait 100ms for the ping to initiate, then open
       setTimeout(() => {
         window.open(centre.websiteUrl, '_blank');
       }, 100);
