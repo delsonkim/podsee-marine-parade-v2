@@ -43,19 +43,27 @@ export default function CentreModal({ centre, open, onClose }) {
     let destination = '';
     let clickType = '';
     
-    if (centre.contactType === 'Whatsapp' && number) {
+    // Debug: log the contactType to see what value we're getting
+    console.log('contactType from data:', centre.contactType);
+    
+    // Check for WhatsApp (try multiple possible values from Excel)
+    if (centre.contactType && centre.contactType.toLowerCase().includes('whatsapp') && number) {
       destination = `https://wa.me/${number}`;
       clickType = 'WhatsApp';
-    } else if (centre.contactType === 'LandLine' && number) {
+    } 
+    // Check for LandLine/Call
+    else if (centre.contactType && (centre.contactType.toLowerCase().includes('landline') || centre.contactType.toLowerCase().includes('call')) && number) {
       destination = `tel:${number}`;
-      clickType = 'Phone';
-    } else if (number) {
-      // Fallback: use whatever number exists
+      clickType = 'Call';
+    } 
+    // Fallback: if we have a number but couldn't determine type, default to Call
+    else if (number) {
       destination = `tel:${number}`;
-      clickType = 'Phone';
+      clickType = 'Call';
     }
     
-    if (destination) {
+    if (destination && clickType) {
+      console.log('Tracking click:', clickType, destination);
       trackClick(clickType, destination);
       setTimeout(() => {
         window.open(destination, '_blank');
