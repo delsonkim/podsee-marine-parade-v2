@@ -1,0 +1,98 @@
+diff --git a/podsee-marine-parade/.env.example b/podsee-marine-parade/.env.example
+index 0b1eee3..a7fd948 100644
+--- a/podsee-marine-parade/.env.example
++++ b/podsee-marine-parade/.env.example
+@@ -3,3 +3,6 @@
+ # Enable: Geocoding API + Places API
+ # Restrict by: HTTP referrer + API restrictions
+ VITE_GOOGLE_MAPS_API_KEY=your_api_key_here
++
++# Outbound Click Tracking Webhook (Google Apps Script URL)
++CLICK_LOG_WEBHOOK_URL=your_google_apps_script_webhook_url_here
+diff --git a/podsee-marine-parade/api/r.js b/podsee-marine-parade/api/r.js
+new file mode 100644
+index 0000000..81e5521
+--- /dev/null
++++ b/podsee-marine-parade/api/r.js
+@@ -0,0 +1,45 @@
++export default async function handler(req, res) {
++  const { centreId, to } = req.query;
++
++  // 1. Robust 'to' handling (Fix #1)
++  const destination = Array.isArray(to) ? to[0] : to;
++
++  if (!destination) {
++    return res.status(400).json({ error: 'Missing destination URL' });
++  }
++
++  // 2. Open-redirect protection (Fix #2)
++  try {
++    const parsedUrl = new URL(destination);
++    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
++      throw new Error('Invalid protocol');
++    }
++  } catch (err) {
++    return res.status(400).json({ error: 'Invalid or restricted destination URL' });
++  }
++
++  const webhookUrl = process.env.CLICK_LOG_WEBHOOK_URL;
++
++  // 3. Prepare logging data
++  const logData = {
++    centreId: centreId || 'unknown',
++    destination: destination,
++    sourcePage: req.headers['referer'] || '',
++    userAgent: req.headers['user-agent'] || '',
++    timestamp: new Date().toISOString(),
++  };
++
++  // 4. Log to webhook (Non-blocking)
++  if (webhookUrl) {
++    fetch(webhookUrl, {
++      method: 'POST',
++      headers: { 'Content-Type': 'application/json' },
++      body: JSON.stringify(logData),
++    }).catch((err) => console.error('Webhook logging failed:', err));
++  } else {
++    console.warn('CLICK_LOG_WEBHOOK_URL not configured');
++  }
++
++  // 5. Immediate Redirect (302)
++  res.redirect(302, destination);
++}
+diff --git a/podsee-marine-parade/src/components/CentreModal.jsx b/podsee-marine-parade/src/components/CentreModal.jsx
+index afb59ac..6d6d9da 100644
+--- a/podsee-marine-parade/src/components/CentreModal.jsx
++++ b/podsee-marine-parade/src/components/CentreModal.jsx
+@@ -9,20 +9,27 @@ export default function CentreModal({ centre, open, onClose }) {
+ 
+   const handlePrimaryAction = () => {
+     const number = centre.whatsappNumber?.toString().replace(/\s/g, '');
++    let destination = '';
+     
+     if (centre.contactType === 'Whatsapp' && number) {
+-      window.open(`https://wa.me/${number}`, '_blank');
++      destination = `https://wa.me/${number}`;
+     } else if (centre.contactType === 'LandLine' && number) {
+-      window.open(`tel:${number}`, '_blank');
++      destination = `tel:${number}`;
+     } else if (number) {
+       // Fallback: use whatever number exists
+-      window.open(`tel:${number}`, '_blank');
++      destination = `tel:${number}`;
++    }
++    
++    if (destination) {
++      const trackingUrl = `/api/r?centreId=${encodeURIComponent(centre.name)}&to=${encodeURIComponent(destination)}`;
++      window.open(trackingUrl, '_blank');
+     }
+   };
+ 
+   const handleWebsiteClick = () => {
+     if (centre.websiteUrl) {
+-      window.open(centre.websiteUrl, '_blank');
++      const trackingUrl = `/api/r?centreId=${encodeURIComponent(centre.name)}&to=${encodeURIComponent(centre.websiteUrl)}`;
++      window.open(trackingUrl, '_blank');
+     }
+   };
+ 
