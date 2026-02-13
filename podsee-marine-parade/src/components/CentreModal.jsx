@@ -5,7 +5,7 @@ import PhoneIcon from '@mui/icons-material/Phone';
 import LanguageIcon from '@mui/icons-material/Language';
 import CommentSection from './CommentSection';
 
-export default function CentreModal({ centre, open, onClose }) {
+export default function CentreModal({ centre, open, onClose, level = null, subject = null }) {
   if (!centre) return null;
 
   // Direct Ping Click Tracking
@@ -137,9 +137,9 @@ export default function CentreModal({ centre, open, onClose }) {
         )}
       </DialogActions>
 
-      {/* Comment Section - Flexible height with internal scrolling */}
+      {/* Parent Reviews - Flexible height with internal scrolling */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-        <CommentSection centre={centre} />
+        <CommentSection centre={centre} level={level} subject={subject} />
       </Box>
     </Dialog>
   );

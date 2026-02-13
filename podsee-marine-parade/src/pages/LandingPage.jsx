@@ -6,6 +6,9 @@ import {
   Typography,
   Button,
   CircularProgress,
+  TextField,
+  Autocomplete,
+  Divider,
 } from '@mui/material'
 import MaterialChipSelector from '../components/MaterialChipSelector'
 import { loadCentresData, getFilterOptions, getSubjectsForLevel } from '../utils/dataLoader'
@@ -13,6 +16,7 @@ import { loadCentresData, getFilterOptions, getSubjectsForLevel } from '../utils
 function LandingPage() {
   const [level, setLevel] = useState('')
   const [subject, setSubject] = useState('')
+  const [centreName, setCentreName] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [filterOptions, setFilterOptions] = useState({ levels: [], subjects: [] })
@@ -51,13 +55,33 @@ function LandingPage() {
     }
   }, [level, centres])
 
-  const handleSearch = () => {
+  const handleSearchByLevelSubject = () => {
     if (!level || !subject) {
       setError('Please select a level and subject.')
       return
     }
     setError('')
     navigate(`/results?level=${level}&subject=${subject}`)
+  }
+
+  const handleSearchByCentre = () => {
+    if (!centreName) {
+      setError('Please enter a centre name.')
+      return
+    }
+    setError('')
+    navigate(`/results?centre=${encodeURIComponent(centreName)}`)
+  }
+
+  const handleSearch = () => {
+    // Determine which search method to use based on what's filled
+    if (centreName) {
+      handleSearchByCentre()
+    } else if (level && subject) {
+      handleSearchByLevelSubject()
+    } else {
+      setError('Please search by centre name OR select level and subject.')
+    }
   }
 
   const handleWhatsApp = () => {
@@ -127,7 +151,7 @@ function LandingPage() {
           </Typography>
         </Box>
 
-        {/* Filters Section */}
+        {/* Search Section */}
         <Box sx={{ mb: 2 }}>
           {loading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
@@ -135,18 +159,79 @@ function LandingPage() {
             </Box>
           ) : (
             <>
+              {/* Centre Name Search */}
+              <Box sx={{ mb: 2 }}>
+                <Autocomplete
+                  freeSolo
+                  options={centres.map(c => c.name)}
+                  value={centreName}
+                  onChange={(event, newValue) => {
+                    setCentreName(newValue || '')
+                    // Clear level/subject when centre is selected
+                    if (newValue) {
+                      setLevel('')
+                      setSubject('')
+                    }
+                  }}
+                  onInputChange={(event, newValue) => {
+                    setCentreName(newValue || '')
+                    // Clear level/subject when typing centre name
+                    if (newValue) {
+                      setLevel('')
+                      setSubject('')
+                    }
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      placeholder="Search by centre name"
+                      variant="outlined"
+                      size="small"
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          fontSize: '14px',
+                          bgcolor: '#ffffff',
+                        }
+                      }}
+                    />
+                  )}
+                />
+              </Box>
+
+              {/* Divider */}
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Divider sx={{ flex: 1 }} />
+                <Typography sx={{ px: 2, color: '#888888', fontSize: '12px', fontWeight: 500 }}>
+                  OR
+                </Typography>
+                <Divider sx={{ flex: 1 }} />
+              </Box>
+
+              {/* Level + Subject Filters */}
               <MaterialChipSelector
                 label="Select Level"
                 options={filterOptions.levels}
                 value={level}
-                onChange={setLevel}
+                onChange={(newLevel) => {
+                  setLevel(newLevel)
+                  // Clear centre name when level is selected
+                  if (newLevel) {
+                    setCentreName('')
+                  }
+                }}
               />
 
               <MaterialChipSelector
                 label="Select Subject"
                 options={validSubjects}
                 value={subject}
-                onChange={setSubject}
+                onChange={(newSubject) => {
+                  setSubject(newSubject)
+                  // Clear centre name when subject is selected
+                  if (newSubject) {
+                    setCentreName('')
+                  }
+                }}
                 disabled={!level}
                 helperText={!level ? 'Select level first' : ''}
               />
@@ -181,12 +266,12 @@ function LandingPage() {
             fontWeight: 600,
             borderRadius: 50,
             textTransform: 'none',
-            bgcolor: level && subject ? '#2c4a3a' : 'rgba(0, 0, 0, 0.12)',
-            color: level && subject ? '#ffffff' : 'rgba(0, 0, 0, 0.26)',
+            bgcolor: (centreName || (level && subject)) ? '#2c4a3a' : 'rgba(0, 0, 0, 0.12)',
+            color: (centreName || (level && subject)) ? '#ffffff' : 'rgba(0, 0, 0, 0.26)',
             boxShadow: 'none',
             border: 'none',
             '&:hover': {
-              bgcolor: level && subject ? '#1f3a0f' : 'rgba(0, 0, 0, 0.15)',
+              bgcolor: (centreName || (level && subject)) ? '#1f3a0f' : 'rgba(0, 0, 0, 0.15)',
               boxShadow: 'none',
             },
             '&:active': {

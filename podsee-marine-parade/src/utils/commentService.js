@@ -62,9 +62,50 @@ function validateComment(text, username) {
 }
 
 /**
- * Fetch top-level comments for a centre
+ * Fetch top-level comments for a centre with optional context filtering
+ * @param {string} centreId - The centre ID
+ * @param {number} limit - Number of comments to fetch
+ * @param {number} offset - Offset for pagination
+ * @param {string|null} level - Optional level filter (null for general comments)
+ * @param {string|null} subject - Optional subject filter (null for general comments)
  */
-export async function fetchComments(centreId, limit = 20, offset = 0) {
+export async function fetchComments(centreId, limit = 20, offset = 0, level = null, subject = null) {
+  try {
+    // If both level and subject are explicitly null or undefined, fetch general comments only
+    // Otherwise, use context-aware RPC if available
+    const useContextFilter = level !== undefined || subject !== undefined;
+
+    if (useContextFilter) {
+      // Try context-aware RPC first (if it exists in backend)
+      const { data, error } = await supabase
+        .rpc('get_comments_with_reply_count_by_context', {
+          p_centre_id: centreId,
+          p_level: level,
+          p_subject: subject,
+          p_limit: limit,
+          p_offset: offset
+        });
+
+      if (error) {
+        // Fallback to basic RPC if context-aware doesn't exist
+        console.warn('Context-aware RPC not available, using basic fetch');
+        return await fetchCommentsBasic(centreId, limit, offset);
+      }
+
+      return { data: data || [], error: null };
+    } else {
+      return await fetchCommentsBasic(centreId, limit, offset);
+    }
+  } catch (error) {
+    console.error('Error fetching comments:', error);
+    return { data: [], error: error.message };
+  }
+}
+
+/**
+ * Fetch top-level comments for a centre (basic, no filtering)
+ */
+async function fetchCommentsBasic(centreId, limit = 20, offset = 0) {
   try {
     const { data, error } = await supabase
       .rpc('get_comments_with_reply_count', {
@@ -72,9 +113,9 @@ export async function fetchComments(centreId, limit = 20, offset = 0) {
         p_limit: limit,
         p_offset: offset
       });
-    
+
     if (error) throw error;
-    
+
     return { data: data || [], error: null };
   } catch (error) {
     console.error('Error fetching comments:', error);
@@ -126,36 +167,50 @@ export async function getReplyCount(parentCommentId) {
 
 /**
  * Create a new comment or reply
+ * @param {string} centreId - The centre ID
+ * @param {string} username - Username
+ * @param {string} text - Comment text
+ * @param {string|null} parentCommentId - Parent comment ID for replies
+ * @param {string|null} level - Level (for top-level comments only, NULL for general)
+ * @param {string|null} subject - Subject (for top-level comments only, NULL for general)
  */
-export async function createComment(centreId, username, text, parentCommentId = null) {
+export async function createComment(centreId, username, text, parentCommentId = null, level = null, subject = null) {
   try {
     // Sanitize inputs
     const sanitizedText = sanitizeText(text);
     const sanitizedUsername = sanitizeText(username);
-    
+
     // Validate
     const errors = validateComment(sanitizedText, sanitizedUsername);
     if (errors.length > 0) {
       return { data: null, error: errors.join('. ') };
     }
-    
-    // If this is a reply, verify parent is a top-level comment
+
+    // Variables to store final level/subject
+    let finalLevel = level;
+    let finalSubject = subject;
+
+    // If this is a reply, verify parent is a top-level comment and inherit its context
     if (parentCommentId) {
       const { data: parentComment, error: parentError } = await supabase
         .from('comments')
-        .select('parent_comment_id')
+        .select('parent_comment_id, level, subject')
         .eq('comment_id', parentCommentId)
         .single();
-      
+
       if (parentError) {
         return { data: null, error: 'Parent comment not found' };
       }
-      
+
       if (parentComment.parent_comment_id !== null) {
         return { data: null, error: 'Cannot reply to a reply. Only top-level comments can be replied to.' };
       }
+
+      // Inherit parent's level and subject for replies
+      finalLevel = parentComment.level;
+      finalSubject = parentComment.subject;
     }
-    
+
     // Insert comment
     const { data, error } = await supabase
       .from('comments')
@@ -164,13 +219,15 @@ export async function createComment(centreId, username, text, parentCommentId = 
         username: sanitizedUsername,
         text: sanitizedText,
         parent_comment_id: parentCommentId,
+        level: finalLevel,
+        subject: finalSubject,
         hidden: false
       })
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return { data, error: null };
   } catch (error) {
     console.error('Error creating comment:', error);
