@@ -52,11 +52,16 @@ function ResultsPage() {
   const [searchParams] = useSearchParams()
   const level = searchParams.get('level')
   const subject = searchParams.get('subject')
+  const centreName = searchParams.get('centre')
 
   const [centres, setCentres] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedCentre, setSelectedCentre] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
+
+  // Determine search mode: centre-name or level+subject
+  const isCentreNameMode = !!centreName
+  const isLevelSubjectMode = !!(level && subject)
   
   // Location-related state
   const [parentLocation, setParentLocation] = useState(null)
@@ -95,14 +100,27 @@ function ResultsPage() {
   }, [])
 
   useEffect(() => {
-    if (!level || !subject) {
+    // Validate: must have either centre name OR (level AND subject)
+    if (!isCentreNameMode && !isLevelSubjectMode) {
       navigate('/')
       return
     }
 
     loadCentresData()
       .then(allCentres => {
-        const filtered = filterCentres(allCentres, level, subject)
+        let filtered = []
+
+        if (isCentreNameMode) {
+          // Centre-name mode: filter by centre name (case-insensitive partial match)
+          const searchTerm = centreName.toLowerCase()
+          filtered = allCentres.filter(centre =>
+            centre.name.toLowerCase().includes(searchTerm)
+          )
+        } else if (isLevelSubjectMode) {
+          // Level+subject mode: filter by level and subject
+          filtered = filterCentres(allCentres, level, subject)
+        }
+
         setCentres(filtered)
         setLoading(false)
       })
@@ -110,7 +128,7 @@ function ResultsPage() {
         console.error('Failed to load data:', err)
         setLoading(false)
       })
-  }, [level, subject, navigate])
+  }, [level, subject, centreName, isCentreNameMode, isLevelSubjectMode, navigate])
 
   // Initialize Google Places Autocomplete
   useEffect(() => {
@@ -368,7 +386,18 @@ function ResultsPage() {
 
           {/* Filter Chips */}
           <Box sx={{ display: 'flex', gap: 1, mb: 1, flexWrap: 'wrap' }}>
-            {level && (
+            {isCentreNameMode && (
+              <Chip
+                label={`Centre: ${centreName}`}
+                size="small"
+                sx={{
+                  bgcolor: '#e3f2fd',
+                  color: '#1565c0',
+                  fontWeight: 500,
+                }}
+              />
+            )}
+            {isLevelSubjectMode && level && (
               <Chip
                 label={level}
                 size="small"
@@ -379,7 +408,7 @@ function ResultsPage() {
                 }}
               />
             )}
-            {subject && (
+            {isLevelSubjectMode && subject && (
               <Chip
                 label={subject}
                 size="small"
@@ -537,22 +566,22 @@ function ResultsPage() {
             </Typography>
           </Box>
         ) : (
-          <Box 
-            sx={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: 2, 
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2,
               pb: 3,
             }}
           >
           {sortedCentres.map((centre) => {
-            // Get the note that matches the current search criteria
-            const matchingNote = getMatchingNote(centre, level, subject);
-            // Get subjects offered by this centre at the selected level
-            const subjectsAtLevel = getSubjectsForCentreAtLevel(centre, level);
+            // Get the note that matches the current search criteria (only for level+subject mode)
+            const matchingNote = isLevelSubjectMode ? getMatchingNote(centre, level, subject) : null;
+            // Get subjects offered by this centre at the selected level (only for level+subject mode)
+            const subjectsAtLevel = isLevelSubjectMode ? getSubjectsForCentreAtLevel(centre, level) : centre.subjects;
             // Get distance if available
             const distance = centreDistances.get(centre.name);
-            
+
             return (
             <Card
               key={centre.name}
@@ -658,6 +687,8 @@ function ResultsPage() {
         centre={selectedCentre}
         open={modalOpen}
         onClose={handleCloseModal}
+        level={isCentreNameMode ? null : level}
+        subject={isCentreNameMode ? null : subject}
       />
     </Box>
   )
