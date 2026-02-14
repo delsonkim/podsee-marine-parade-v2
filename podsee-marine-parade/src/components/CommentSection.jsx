@@ -64,6 +64,9 @@ export default function CommentSection({ centre, level = null, subject = null })
   const [writeClass, setWriteClass] = useState('');
   const [showWriteInput, setShowWriteInput] = useState(false);
 
+  // Track why the username prompt was opened: 'write-review' | null
+  const pendingActionRef = useRef(null);
+
   // Two-phase fade animation
   const [contentOpacity, setContentOpacity] = useState(1);
   const fadeTimeoutRef = useRef(null);
@@ -273,6 +276,7 @@ export default function CommentSection({ centre, level = null, subject = null })
 
   const handleWriteReviewClick = () => {
     if (!username) {
+      pendingActionRef.current = 'write-review';
       setShowUsernamePrompt(true);
       return;
     }
@@ -297,6 +301,17 @@ export default function CommentSection({ centre, level = null, subject = null })
   const handleUsernameSubmit = (newUsername) => {
     setUsername(newUsername);
     setShowUsernamePrompt(false);
+
+    // Continue write-review flow if that's what triggered the prompt
+    if (pendingActionRef.current === 'write-review') {
+      pendingActionRef.current = null;
+      if (singleOffering) {
+        setWriteClass(singleOffering.key);
+      }
+      setShowWriteInput(true);
+    } else {
+      pendingActionRef.current = null;
+    }
   };
 
   const handleUsernameRequired = () => {
@@ -649,7 +664,10 @@ export default function CommentSection({ centre, level = null, subject = null })
       <UsernamePrompt
         open={showUsernamePrompt}
         onSubmit={handleUsernameSubmit}
-        onCancel={() => setShowUsernamePrompt(false)}
+        onCancel={() => {
+          pendingActionRef.current = null;
+          setShowUsernamePrompt(false);
+        }}
       />
     </Box>
   );
