@@ -200,11 +200,11 @@ function LandingPage() {
 
               {/* Divider */}
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <Divider sx={{ flex: 1 }} />
+                <Divider sx={{ flex: 1, borderColor: 'rgba(0, 0, 0, 0.2)' }} />
                 <Typography sx={{ px: 2, color: '#888888', fontSize: '12px', fontWeight: 500 }}>
                   OR
                 </Typography>
-                <Divider sx={{ flex: 1 }} />
+                <Divider sx={{ flex: 1, borderColor: 'rgba(0, 0, 0, 0.2)' }} />
               </Box>
 
               {/* Level + Subject Filters */}

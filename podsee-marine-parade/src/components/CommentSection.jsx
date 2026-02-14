@@ -99,8 +99,15 @@ export default function CommentSection({ centre, level = null, subject = null })
       }
     });
 
+    // Filter based on props: if level && subject exist, only show that specific combination
+    let filteredItems = items;
+    if (level && subject) {
+      const targetKey = filterKey(level, subject);
+      filteredItems = items.filter(item => item.key === targetKey);
+    }
+
     // Sort: LEVEL_ORDER first, then SUBJECT_ORDER, unknowns to end
-    items.sort((a, b) => {
+    filteredItems.sort((a, b) => {
       const la = LEVEL_ORDER.indexOf(a.level);
       const lb = LEVEL_ORDER.indexOf(b.level);
       const laIdx = la === -1 ? 9999 : la;
@@ -118,8 +125,8 @@ export default function CommentSection({ centre, level = null, subject = null })
       return a.subject.localeCompare(b.subject);
     });
 
-    return items;
-  }, [centre.offerings]);
+    return filteredItems;
+  }, [centre.offerings, level, subject]);
 
   // Group offerings by level for dropdown display
   const groupedOfferings = useMemo(() => {
