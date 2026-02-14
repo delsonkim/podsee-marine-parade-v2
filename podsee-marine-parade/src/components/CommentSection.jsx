@@ -391,7 +391,7 @@ export default function CommentSection({ centre, level = null, subject = null })
               All Reviews
             </MenuItem>
 
-            {offerings.length > 0 && <Divider sx={{ my: 0.5 }} />}
+            {offerings.length > 0 && <Divider sx={{ my: 0.5, borderColor: 'rgba(0, 0, 0, 0.12)' }} />}
 
             {groupedOfferings.map((entry, idx) => {
               if (entry.type === 'header') {
